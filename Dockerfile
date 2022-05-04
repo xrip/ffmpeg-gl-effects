@@ -18,44 +18,14 @@ WORKDIR /build
 RUN apt-get -y update -y && apt-get -y upgrade && apt-get -y install git
 # dependencies needed for ffmpeg compile
 RUN DEBIAN_FRONTEND=noninteractive TZ=Europe/Moscow apt-get -y install gcc g++ make pkg-config \
-    libglfw3-dev libglfw3 libglew2.1 libglew-dev \
-    nasm yasm libx264-dev libx265-dev libglu1-mesa-dev \
-    libmp3lame-dev
+    nasm yasm libglew2.1 libglew-dev libx264-dev libglu1-mesa libmp3lame-dev
  \
     # get ffmpeg sources
-RUN git clone --depth 1 http://git.videolan.org/git/ffmpeg.git/ ffmpeg
+RUN git clone --depth 1 http://git.videolan.org/git/ffmpeg.git/ ffmpeg && git clone --depth 1 https://github.com/xrip/ffmpeg-gl-effects.git && cp /build/ffmpeg-gl-effects/*.c ffmpeg/libavfilter/
 
-# get ffmpeg-gl-effects modifications1
-# this pulls from the original master for standalone use
-# but you could modify to copy from your clone/repository
-RUN echo 2 && git clone --depth 1 https://github.com/xrip/ffmpeg-gl-effects.git
+# apply patch, configure/compile/install ffmpeg
+RUN (cd ffmpeg; git apply /build/ffmpeg-gl-effects/ffmpeg.diff; ./configure --enable-libx264 --enable-libmp3lame --enable-nonfree --enable-gpl --enable-opengl --enable-filter=gltransition --enable-filter=shadertoy --extra-libs='-lGLEW -lEGL -ldl'; make -j && make install )
 
-RUN cp /build/ffmpeg-gl-effects/*.c ffmpeg/libavfilter/
 
-# apply patch
-RUN (cd ffmpeg; git apply /build/ffmpeg-gl-effects/ffmpeg.diff)
-
-# there are a bunch more libraries that you could possibly enable in ffmpeg
-# to do see see configure --help of ffmpeg   add the flag below and any necessary library install above
-
-# configure/compile/install ffmpeg
-RUN (cd ffmpeg;  ./configure --enable-libx264 --enable-libx265 --enable-libmp3lame --enable-nonfree --enable-gpl --enable-opengl --enable-filter=gltransition --enable-filter=shadertoy --extra-libs='-lGLEW -lEGL -ldl' )
-# the -j speeds up compilation, but if your container host is limited on resources, you may need to
-# remove it to force a non-parallel build to avoid memory usage issues
-RUN (cd ffmpeg; make -j)
-RUN (cd ffmpeg; make install)
-
-# needed for running it
-RUN apt-get -y install xvfb
-
-# try the demo
-RUN (cd ffmpeg-gl-effects; ln -s /usr/local/bin/ffmpeg .)
-
-RUN (cd ffmpeg-gl-effects; bash gl.sh )
-RUN (cd ffmpeg-gl-effects; bash concat.sh )
-# result would be in out.mp4 in that directory
-
-# drop you into a shell to look around
-# modify as needed for actual use
 ENTRYPOINT /bin/bash
 
