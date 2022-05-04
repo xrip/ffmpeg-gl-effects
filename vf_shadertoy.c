@@ -2,7 +2,7 @@
  * Shadertoy ffmpeg filter
  * @Date    20210530
  * @Author  Canta <canta@canta.com.ar>
- * 
+ *
  * @Comments: Check previous projects from other authors:
  *            - https://github.com/transitive-bullshit/ffmpeg-gl-transition
  *            - https://github.com/nervous-systems/ffmpeg-opengl
@@ -12,8 +12,17 @@
 #include "libavutil/opt.h"
 #include "internal.h"
 
+#ifndef __APPLE__
+# define GL_TRANSITION_USING_EGL //remove this line if you don't want to use EGL
+#endif
+
 #include <GL/glew.h>
-#include <GLFW/glfw3.h>
+#ifdef GL_TRANSITION_USING_EGL
+# include <EGL/egl.h>
+# include <EGL/eglext.h>
+#else
+# include <GLFW/glfw3.h>
+#endif
 
 // #define TS2T(ts, tb) ((ts) == AV_NOPTS_VALUE ? NAN : (double)(ts)*av_q2d(tb))
 
@@ -88,6 +97,16 @@ void main()\n\
 static GLchar fragment_shader[65535];
 
 #define PIXEL_FORMAT GL_RGB
+#ifdef GL_TRANSITION_USING_EGL
+static const EGLint configAttribs[] = {
+    EGL_SURFACE_TYPE, EGL_PBUFFER_BIT,
+    EGL_BLUE_SIZE, 8,
+    EGL_GREEN_SIZE, 8,
+    EGL_RED_SIZE, 8,
+    EGL_DEPTH_SIZE, 8,
+    EGL_RENDERABLE_TYPE, EGL_OPENGL_BIT,
+    EGL_NONE};
+#endif
 
 typedef struct {
     const AVClass *class;
@@ -107,9 +126,16 @@ typedef struct {
     GLint           play_time;
     GLuint          program;
     GLuint          frame_tex;
-    GLFWwindow      *window;
+#ifdef GL_TRANSITION_USING_EGL
+  EGLDisplay eglDpy;
+  EGLConfig eglCfg;
+  EGLSurface eglSurf;
+  EGLContext eglCtx;
+#else
+  GLFWwindow    *window;
+#endif
     GLuint          pos_buf;
-    
+
     // Shadertoy vars
     GLuint  resolution;
     GLfloat timedelta;
@@ -138,7 +164,7 @@ static const AVOption shadertoy_options[] = {
                         {.str = NULL},
                         CHAR_MIN,
                         CHAR_MAX,
-                        FLAGS}, 
+                        FLAGS},
     {"vertex_file", "Optional. "
                     "Path to file with custom vertex shader for the shadertoy. "
                     "By default this filter uses shadertoy webside default vertex shader.",
@@ -181,15 +207,15 @@ static GLuint build_shader(AVFilterContext *ctx, const GLchar *shader_source, GL
     } else {
         av_log(ctx, AV_LOG_DEBUG, "vf_shadertoy: shader created.\n");
     }
-    
+
     glShaderSource(shader, 1, &shader_source, 0);
     glCompileShader(shader);
     GLint status;
     glGetShaderiv(shader, GL_COMPILE_STATUS, &status);
-   
+
     // error message
     int InfoLogLength = 0;
-    glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &InfoLogLength); 
+    glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &InfoLogLength);
     if (InfoLogLength > 0) {
         char *ShaderErrorMessage = (char *)malloc(InfoLogLength);
 
@@ -243,7 +269,7 @@ static int build_program(AVFilterContext *ctx) {
         av_log(ctx, AV_LOG_DEBUG, "vf_shadertoy: build_program shader params: %s\n", gs->shadertoy_file);
         FILE *f = fopen(gs->shadertoy_file, "rb");
         if (!f) {
-            av_log(ctx, AV_LOG_ERROR, 
+            av_log(ctx, AV_LOG_ERROR,
                 "vf_shadertoy: build_program shader: invalid shader source file \"%s\"\n", gs->shadertoy_file);
             return -1;
         }
@@ -257,25 +283,25 @@ static int build_program(AVFilterContext *ctx) {
         fread(gs->shadertoy_file_data, fsize, 1, f);
         fclose(f);
         gs->shadertoy_file_data[fsize] = 0;
-        
+
         //av_log(ctx, AV_LOG_DEBUG, "vf_shadertoy: loaded shader: %s\n", gs->shadertoy_file_data);
         //av_log(ctx, AV_LOG_DEBUG, "vf_shadertoy: will blend shader into: %s\n", f_shader_source_template);
-        
+
         // mixing input shader with shadertoy base code
         av_log(ctx, AV_LOG_DEBUG, "vf_shadertoy: sizes: \nfragment_shader: %ld\nloaded shader: %ld\ntemplate: %ld",
           sizeof(fragment_shader),
           sizeof(gs->shadertoy_file_data),
           sizeof(f_shader_source_template)
         );
-        
+
         snprintf(
           &fragment_shader,
           sizeof(f_shader_source_template) + fsize + 1,
           f_shader_source_template,
           gs->shadertoy_file_data
         );
-        
-        
+
+
         av_log(ctx, AV_LOG_DEBUG, "vf_shadertoy: blended shader: %s\n", fragment_shader);
 
     } else {
@@ -290,7 +316,7 @@ static int build_program(AVFilterContext *ctx) {
         av_log(ctx, AV_LOG_DEBUG, "vf_shadertoy: build_program vertex params: %s\n", gs->vertex_file);
         FILE *f = fopen(gs->vertex_file, "rb");
         if (!f) {
-            av_log(ctx, AV_LOG_ERROR, 
+            av_log(ctx, AV_LOG_ERROR,
                 "vf_shadertoy: build_program shader: invalid shader source file \"%s\"\n", gs->vertex_file);
             return -1;
         }
@@ -312,11 +338,11 @@ static int build_program(AVFilterContext *ctx) {
     const char *gl_shadertoy_file_dst = fragment_shader;
     const char *gl_vertex_file_dst = gs->vertex_file_data ? gs->vertex_file_data : v_shader_source;
 
-    av_log(ctx, AV_LOG_DEBUG, 
+    av_log(ctx, AV_LOG_DEBUG,
         "vf_shadertoy: build_program build_shader debug shaders ===================================>\n");
-    av_log(ctx, AV_LOG_DEBUG, 
+    av_log(ctx, AV_LOG_DEBUG,
         "vf_shadertoy: build_program build_shader fragment shaders:\n%s\n", gl_shadertoy_file_dst);
-    av_log(ctx, AV_LOG_DEBUG, 
+    av_log(ctx, AV_LOG_DEBUG,
         "vf_shadertoy: build_program build_shader vertex shader:\n%s\n", gl_vertex_file_dst);
 
     if (gs->render_start_time > 0) {
@@ -373,7 +399,7 @@ static int build_program(AVFilterContext *ctx) {
 static void uni_setup(AVFilterLink *inLink) {
     AVFilterContext   *ctx = inLink->dst;
     shadertoyContext  *c = ctx->priv;
-    
+
     // Shadertoy vars
     /*
     uniform vec3      iResolution;           // viewport resolution (in pixels)
@@ -415,8 +441,9 @@ static void uni_setup(AVFilterLink *inLink) {
 
 static av_cold int init(AVFilterContext *ctx) {
 
+#ifndef GL_TRANSITION_USING_EGL
   glfwSetErrorCallback(glfw_onError);
-  
+#endif
   return 0;
 }
 
@@ -434,7 +461,47 @@ static int config_props(AVFilterLink *inlink) {
   shadertoyContext *gs  = ctx->priv;
   gs->start_play_time   = -1;
 
-  
+#ifdef GL_TRANSITION_USING_EGL
+  //init EGL
+  // 1. Initialize EGL
+  // c->eglDpy = eglGetDisplay(EGL_DEFAULT_DISPLAY);
+
+  #define MAX_DEVICES 4
+  EGLDeviceEXT eglDevs[MAX_DEVICES];
+  EGLint numDevices;
+
+  PFNEGLQUERYDEVICESEXTPROC eglQueryDevicesEXT =(PFNEGLQUERYDEVICESEXTPROC)
+  eglGetProcAddress("eglQueryDevicesEXT");
+
+  eglQueryDevicesEXT(MAX_DEVICES, eglDevs, &numDevices);
+
+  PFNEGLGETPLATFORMDISPLAYEXTPROC eglGetPlatformDisplayEXT =  (PFNEGLGETPLATFORMDISPLAYEXTPROC)
+  eglGetProcAddress("eglGetPlatformDisplayEXT");
+
+  gs->eglDpy = eglGetPlatformDisplayEXT(EGL_PLATFORM_DEVICE_EXT, eglDevs[0], 0);
+
+  EGLint major, minor;
+  eglInitialize(gs->eglDpy, &major, &minor);
+  av_log(ctx, AV_LOG_DEBUG, "%d%d", major, minor);
+  // 2. Select an appropriate configuration
+  EGLint numConfigs;
+  EGLint pbufferAttribs[] = {
+      EGL_WIDTH,
+      inlink->w,
+      EGL_HEIGHT,
+      inlink->h,
+      EGL_NONE,
+  };
+  eglChooseConfig(gs->eglDpy, configAttribs, &gs->eglCfg, 1, &numConfigs);
+  // 3. Create a surface
+  gs->eglSurf = eglCreatePbufferSurface(gs->eglDpy, gs->eglCfg,
+                                       pbufferAttribs);
+  // 4. Bind the API
+  eglBindAPI(EGL_OPENGL_API);
+  // 5. Create a context and make it current
+  gs->eglCtx = eglCreateContext(gs->eglDpy, gs->eglCfg, EGL_NO_CONTEXT, NULL);
+  eglMakeCurrent(gs->eglDpy, gs->eglSurf, gs->eglSurf, gs->eglCtx);
+#else
   if (glfwInit() != GLFW_TRUE) {
     av_log(ctx, AV_LOG_ERROR, "vf_shadertoy: GLFW initialization failed\n");
     return -1;
@@ -444,6 +511,7 @@ static int config_props(AVFilterLink *inlink) {
   gs->window = glfwCreateWindow(inlink->w, inlink->h, "", NULL, NULL);
 
   glfwMakeContextCurrent(gs->window);
+#endif
 
   if(glewInit() != GLEW_OK) {
     av_log(ctx, AV_LOG_ERROR, "vf_shadertoy: GLEW initialization failed\n");
@@ -493,7 +561,13 @@ static int filter_frame(AVFilterLink *inlink, AVFrame *in) {
         av_frame_free(&out);
         return -1;
     }
-    glfwMakeContextCurrent(gs->window);
+
+    #ifdef GL_TRANSITION_USING_EGL
+      eglMakeCurrent(gs->eglDpy, gs->eglSurf, gs->eglSurf, gs->eglCtx);
+    #else
+      glfwMakeContextCurrent(gs->window);
+    #endif
+
     glUseProgram(gs->program);
 
     if ( // check if render
@@ -526,6 +600,17 @@ static av_cold void uninit(AVFilterContext *ctx) {
     shadertoyContext *c = ctx->priv;
 
     av_log(ctx, AV_LOG_DEBUG, "vf_shadertoy: check window\n");
+    #ifdef GL_TRANSITION_USING_EGL
+      if (c->eglDpy) {
+        av_log(ctx, AV_LOG_DEBUG, "vf_shadertoy: gldelete operations\n");
+        glDeleteTextures(1, &c->frame_tex);
+        glDeleteBuffers(1, &c->pos_buf);
+        glDeleteProgram(c->program);
+        eglTerminate(c->eglDpy);
+      } else {
+               av_log(ctx, AV_LOG_DEBUG, "vf_shadertoy: no window, don't need gldelete operations\n");
+           }
+    #else
     if (c->window) { // @new
         av_log(ctx, AV_LOG_DEBUG, "vf_shadertoy: gldelete operations\n");
         glDeleteTextures(1, &c->frame_tex);
@@ -535,6 +620,7 @@ static av_cold void uninit(AVFilterContext *ctx) {
     } else {
         av_log(ctx, AV_LOG_DEBUG, "vf_shadertoy: no window, don't need gldelete operations\n");
     }
+    #endif
 
     av_log(ctx, AV_LOG_DEBUG, "vf_shadertoy: finished\n");
 
