@@ -1,7 +1,7 @@
 #!/bin/bash
 # Example of concatenating 3 mp4s together with 1-second transitions between them.
 
-./ffmpeg \
+ffmpeg \
   -i media/0.mp4 \
   -i media/1.mp4 \
   -i media/2.mp4 \
