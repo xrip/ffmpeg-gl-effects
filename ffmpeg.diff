@@ -1,14 +1,28 @@
 diff --git a/libavfilter/Makefile b/libavfilter/Makefile
-index e06acdf..7edf7c5 100644
+index e06acdf..e462a52 100644
 --- a/libavfilter/Makefile
 +++ b/libavfilter/Makefile
-@@ -541,0 +542,2 @@ OBJS-$(CONFIG_ZSCALE_FILTER)                 += vf_zscale.o
+@@ -540,6 +540,9 @@ OBJS-$(CONFIG_ZMQ_FILTER)                    += f_zmq.o
+ OBJS-$(CONFIG_ZOOMPAN_FILTER)                += vf_zoompan.o
+ OBJS-$(CONFIG_ZSCALE_FILTER)                 += vf_zscale.o
+ 
 +OBJS-$(CONFIG_GLTRANSITION_FILTER)           += vf_gltransition.o
 +OBJS-$(CONFIG_SHADERTOY_FILTER)              += vf_shadertoy.o
++
+ OBJS-$(CONFIG_ALLRGB_FILTER)                 += vsrc_testsrc.o
+ OBJS-$(CONFIG_ALLYUV_FILTER)                 += vsrc_testsrc.o
+ OBJS-$(CONFIG_CELLAUTO_FILTER)               += vsrc_cellauto.o
 diff --git a/libavfilter/allfilters.c b/libavfilter/allfilters.c
-index 2ad523f..278dd1f 100644
+index 2ad523f..5d6b7e1 100644
 --- a/libavfilter/allfilters.c
 +++ b/libavfilter/allfilters.c
-@@ -512,0 +513,2 @@ extern const AVFilter ff_vf_zscale;
+@@ -511,6 +511,9 @@ extern const AVFilter ff_vf_zmq;
+ extern const AVFilter ff_vf_zoompan;
+ extern const AVFilter ff_vf_zscale;
+ 
 +extern const AVFilter ff_vf_gltransition;
 +extern const AVFilter ff_vf_shadertoy;
++
+ extern const AVFilter ff_vsrc_allrgb;
+ extern const AVFilter ff_vsrc_allyuv;
+ extern const AVFilter ff_vsrc_cellauto;
