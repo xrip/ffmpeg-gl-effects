@@ -25,10 +25,10 @@ RUN DEBIAN_FRONTEND=noninteractive TZ=Europe/Moscow apt-get -y install gcc g++ m
     # get ffmpeg sources
 RUN git clone --depth 1 http://git.videolan.org/git/ffmpeg.git/ ffmpeg
 
-# get ffmpeg-gl-effects modifications
+# get ffmpeg-gl-effects modifications1
 # this pulls from the original master for standalone use
 # but you could modify to copy from your clone/repository
-RUN git clone --depth 1 https://github.com/xrip/ffmpeg-gl-effects.git
+RUN git clone --depth 2 https://github.com/xrip/ffmpeg-gl-effects.git
 
 RUN cp /build/ffmpeg-gl-effects/*.c ffmpeg/libavfilter/
 
