@@ -513,10 +513,10 @@ static int config_props(AVFilterLink *inlink) {
   glfwMakeContextCurrent(gs->window);
 #endif
 
-  if(glewInit() != GLEW_OK) {
-    av_log(ctx, AV_LOG_ERROR, "vf_shadertoy: GLEW initialization failed\n");
-    return -1;
-  }
+#ifndef __APPLE__
+  glewExperimental = GL_TRUE;
+  glewInit();
+#endif
 
   glViewport(0, 0, inlink->w, inlink->h);
   gs->timebase = inlink->time_base;
