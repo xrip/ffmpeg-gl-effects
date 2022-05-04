@@ -28,7 +28,7 @@ RUN git clone --depth 1 http://git.videolan.org/git/ffmpeg.git/ ffmpeg
 # get ffmpeg-gl-effects modifications1
 # this pulls from the original master for standalone use
 # but you could modify to copy from your clone/repository
-RUN git clone --depth 1 https://github.com/xrip/ffmpeg-gl-effects.git
+RUN echo 1 && git clone --depth 1 https://github.com/xrip/ffmpeg-gl-effects.git
 
 RUN cp /build/ffmpeg-gl-effects/*.c ffmpeg/libavfilter/
 
@@ -39,7 +39,7 @@ RUN (cd ffmpeg; git apply /build/ffmpeg-gl-effects/ffmpeg.diff)
 # to do see see configure --help of ffmpeg   add the flag below and any necessary library install above
 
 # configure/compile/install ffmpeg
-RUN (cd ffmpeg; ./configure --enable-libx264 --enable-libx265 --enable-libmp3lame --enable-nonfree --enable-gpl --enable-opengl --enable-filter=gltransition --enable-filter=shadertoy --extra-libs='-lGLEW -lglfw -lEGL -ldl' )
+RUN (cd ffmpeg;  ./configure --enable-libx264 --enable-libx265 --enable-libmp3lame --enable-nonfree --enable-gpl --enable-opengl --enable-filter=gltransition --enable-filter=shadertoy --extra-libs='-lGLEW -lEGL -ldl' )
 # the -j speeds up compilation, but if your container host is limited on resources, you may need to
 # remove it to force a non-parallel build to avoid memory usage issues
 RUN (cd ffmpeg; make -j)
@@ -50,7 +50,9 @@ RUN apt-get -y install xvfb
 
 # try the demo
 RUN (cd ffmpeg-gl-effects; ln -s /usr/local/bin/ffmpeg .)
-RUN (cd ffmpeg-gl-effects; xvfb-run -s '+iglx -screen 0 1920x1080x24' bash concat.sh )
+
+RUN (cd ffmpeg-gl-effects; bash gl.sh )
+RUN (cd ffmpeg-gl-effects; bash concat.sh )
 # result would be in out.mp4 in that directory
 
 # drop you into a shell to look around
