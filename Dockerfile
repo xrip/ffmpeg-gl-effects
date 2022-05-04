@@ -4,7 +4,7 @@
 # manually and get the same result
 
 
-FROM debian:stretch
+FROM ubuntu:20.04
 # should also work for
 #FROM ubuntu:18.04
 
@@ -12,44 +12,34 @@ FROM debian:stretch
 WORKDIR /build
 
 # enable contrib/non-free
-RUN sed -E -e 's/\s+main\s?$/ main contrib non-free /' /etc/apt/sources.list >/etc/apt/sources.list.new && mv /etc/apt/sources.list.new /etc/apt/sources.list
+#RUN sed -E -e 's/\s+main\s?$/ main contrib non-free /' /etc/apt/sources.list >/etc/apt/sources.list.new && mv /etc/apt/sources.list.new /etc/apt/sources.list
 
-# update anything needed
-RUN apt-get -y update -y && apt-get -y upgrade
+# update anything needed & install git
+RUN apt-get -y update -y && apt-get -y upgrade && apt-get -y install git
+# dependencies needed for ffmpeg compile
+RUN DEBIAN_FRONTEND=noninteractive TZ=Europe/Moscow apt-get -y install gcc g++ make pkg-config \
+    libglfw3-dev libglfw3 libglew2.1 libglew-dev \
+    nasm yasm libx264-dev libx265-dev libglu1-mesa-dev \
+    libmp3lame-dev
+ \
+    # get ffmpeg sources
+RUN git clone --depth 1 http://git.videolan.org/git/ffmpeg.git/ ffmpeg
 
-# need git
-RUN apt-get -y install git
-
-# get ffmpeg sources
-RUN git clone http://source.ffmpeg.org/git/ffmpeg.git ffmpeg
-
-# get ffmpeg-gl-transition modifications
+# get ffmpeg-gl-effects modifications
 # this pulls from the original master for standalone use
 # but you could modify to copy from your clone/repository
-RUN git clone https://github.com/transitive-bullshit/ffmpeg-gl-transition.git
+RUN git clone --depth 1 https://github.com/xrip/ffmpeg-gl-effects.git
 
-# dependencies needed for ffmpeg compile
-RUN apt-get -y install gcc g++ make xorg-dev pkg-config \
-                       libglew2.0 libglew-dev libglfw3-dev \
-                       nasm yasm libx264-dev libx265-dev libvpx-dev libglu1-mesa-dev \
-                       libmp3lame-dev libopus-dev libfdk-aac-dev
-
-# disable EGL
-RUN grep -v "define GL_TRANSITION_USING_EGL" /build/ffmpeg-gl-transition/vf_gltransition.c > ffmpeg/libavfilter/vf_gltransition.c
-# if you want to try EGL comment the above line and uncomment the below line
-# also replace -lglfw with -lEGL in the extra_libs section of the ffmpeg
-# configure farther down this file
-# NOTE: could not get EGL to work in container!
-#RUN cp /build/ffmpeg-gl-transition/vf_gltransition.c ffmpeg/libavfilter/vf_gltransition.c
+RUN cp /build/ffmpeg-gl-effects/*.c ffmpeg/libavfilter/
 
 # apply patch
-RUN (cd ffmpeg; git apply /build/ffmpeg-gl-transition/ffmpeg.diff)
+RUN (cd ffmpeg; git apply /build/ffmpeg-gl-effects/ffmpeg.diff)
 
 # there are a bunch more libraries that you could possibly enable in ffmpeg
 # to do see see configure --help of ffmpeg   add the flag below and any necessary library install above
 
 # configure/compile/install ffmpeg
-RUN (cd ffmpeg; ./configure --enable-libx264 --enable-libx265 --enable-libvpx  --enable-libfdk-aac --enable-libmp3lame --enable-libopus --enable-nonfree --enable-gpl --enable-opengl --enable-filter=gltransition --extra-libs='-lGLEW -lglfw -ldl' )
+RUN (cd ffmpeg; ./configure --enable-libx264 --enable-libx265 --enable-libmp3lame --enable-nonfree --enable-gpl --enable-opengl --enable-filter=gltransition --enable-filter=shadertoy --extra-libs='-lGLEW -lglfw -lEGL -ldl' )
 # the -j speeds up compilation, but if your container host is limited on resources, you may need to
 # remove it to force a non-parallel build to avoid memory usage issues
 RUN (cd ffmpeg; make -j)
