@@ -28,7 +28,7 @@ RUN git clone --depth 1 http://git.videolan.org/git/ffmpeg.git/ ffmpeg
 # get ffmpeg-gl-effects modifications1
 # this pulls from the original master for standalone use
 # but you could modify to copy from your clone/repository
-RUN git clone --depth 2 https://github.com/xrip/ffmpeg-gl-effects.git
+RUN git clone --depth 1 https://github.com/xrip/ffmpeg-gl-effects.git
 
 RUN cp /build/ffmpeg-gl-effects/*.c ffmpeg/libavfilter/
 
@@ -49,8 +49,8 @@ RUN (cd ffmpeg; make install)
 RUN apt-get -y install xvfb
 
 # try the demo
-RUN (cd ffmpeg-gl-transition; ln -s /usr/local/bin/ffmpeg .)
-RUN (cd ffmpeg-gl-transition; xvfb-run -s '+iglx -screen 0 1920x1080x24' bash concat.sh )
+RUN (cd ffmpeg-gl-effects; ln -s /usr/local/bin/ffmpeg .)
+RUN (cd ffmpeg-gl-effects; xvfb-run -s '+iglx -screen 0 1920x1080x24' bash concat.sh )
 # result would be in out.mp4 in that directory
 
 # drop you into a shell to look around
