@@ -19,7 +19,7 @@ RUN apt-get -y update -y && apt-get -y upgrade && apt-get -y install git
 # dependencies needed for ffmpeg compile
 RUN DEBIAN_FRONTEND=noninteractive TZ=Europe/Moscow apt-get -y install gcc g++ make pkg-config \
     nasm yasm libglew2.1 libglew-dev libx264-dev libglu1-mesa libmp3lame-dev
- \
+ 
     # get ffmpeg sources
 RUN git clone --depth 1 http://git.videolan.org/git/ffmpeg.git/ ffmpeg && git clone --depth 1 https://github.com/xrip/ffmpeg-gl-effects.git && cp /build/ffmpeg-gl-effects/*.c ffmpeg/libavfilter/
 
